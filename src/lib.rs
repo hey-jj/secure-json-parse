@@ -60,7 +60,7 @@ use serde_json::Value;
 ///
 /// `proto_action` and `constructor_action` each take one of these. The default
 /// is [`Action::Error`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Action {
     /// Reject the input with [`Error::ForbiddenProperty`].
     #[default]
@@ -75,7 +75,7 @@ pub enum Action {
 ///
 /// Build one with [`Options::default`] and the chained setters. The defaults
 /// match a strict parser: both actions are [`Action::Error`] and `safe` is off.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Options {
     /// Action for a `__proto__` key.
     pub proto_action: Action,
