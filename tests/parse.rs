@@ -74,3 +74,26 @@ fn hasownproperty_data_key_survives_removal() {
     let v = parse(HASOWN, &proto_remove()).unwrap().unwrap();
     assert_eq!(v, json!({"a": 5, "b": 6, "hasOwnProperty": "text"}));
 }
+
+#[test]
+fn bytes_path_errors_on_proto() {
+    let err = parse_bytes(br#"{"__proto__": {"x": 1}}"#, &Options::default());
+    assert!(matches!(err, Err(Error::ForbiddenProperty)));
+}
+
+#[test]
+fn bytes_path_removes_proto() {
+    let v = parse_bytes(br#"{"a": 1, "__proto__": {"x": 1}}"#, &proto_remove())
+        .unwrap()
+        .unwrap();
+    assert_eq!(v, json!({"a": 1}));
+}
+
+#[test]
+fn bytes_path_errors_on_constructor() {
+    let err = parse_bytes(
+        br#"{"constructor": {"prototype": {}}}"#,
+        &Options::default(),
+    );
+    assert!(matches!(err, Err(Error::ForbiddenProperty)));
+}
