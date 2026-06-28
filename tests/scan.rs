@@ -63,6 +63,18 @@ fn deeply_nested_value_does_not_overflow_the_stack() {
         outer.insert("c".into(), value);
         value = Value::Object(outer);
     }
+
     let result = scan(value, &ctor_remove());
     assert!(result.is_ok());
+
+    // serde_json::Value drops recursively, so a 100k-deep tree would overflow
+    // the stack on teardown and mask the walk's own stack-safety. Take the tree
+    // apart top down so the scan, not the drop, is what this test exercises.
+    let mut value = result.unwrap().unwrap();
+    while let Value::Object(mut map) = value {
+        match map.remove("c") {
+            Some(child) => value = child,
+            None => break,
+        }
+    }
 }
