@@ -41,10 +41,10 @@
 //!
 //! // Clean input parses to a value.
 //! assert!(matches!(safe_parse(r#"{"a": 1}"#), SafeOutcome::Value(_)));
-//! // A forbidden key yields Null.
-//! assert!(matches!(safe_parse(r#"{"__proto__": {}}"#), SafeOutcome::Null));
-//! // Malformed JSON yields Undefined.
-//! assert!(matches!(safe_parse(r#"{"a": "#), SafeOutcome::Undefined));
+//! // A forbidden key yields Violation.
+//! assert!(matches!(safe_parse(r#"{"__proto__": {}}"#), SafeOutcome::Violation));
+//! // Malformed JSON yields Malformed.
+//! assert!(matches!(safe_parse(r#"{"a": "#), SafeOutcome::Malformed));
 //! ```
 
 #![forbid(unsafe_code)]
@@ -152,16 +152,17 @@ impl std::error::Error for Error {
 
 /// The three outcomes of [`safe_parse`].
 ///
-/// These mirror the JavaScript `safeParse` return values: a parsed value,
-/// `null` for a security violation, and `undefined` for a parse error.
+/// The variant names state the outcome. The JavaScript `safeParse` maps the
+/// same three cases to a value, `null` for a violation, and `undefined` for a
+/// parse error.
 #[derive(Debug)]
 pub enum SafeOutcome {
     /// Parsed cleanly. Holds the value.
     Value(Value),
-    /// A forbidden prototype property was found. Maps to JavaScript `null`.
-    Null,
-    /// The JSON text was malformed. Maps to JavaScript `undefined`.
-    Undefined,
+    /// A forbidden prototype property was found. JavaScript returns `null`.
+    Violation,
+    /// The JSON text was malformed. JavaScript returns `undefined`.
+    Malformed,
 }
 
 /// Drop a leading `U+FEFF` byte order mark from a string.
@@ -222,9 +223,9 @@ pub fn parse_bytes(bytes: &[u8], options: &Options) -> Result<Option<Value>, Err
 /// Parse JSON text and fold every outcome into a [`SafeOutcome`].
 ///
 /// Runs with both actions at [`Action::Error`] and `safe` on. A clean parse
-/// returns [`SafeOutcome::Value`]. A forbidden key returns [`SafeOutcome::Null`].
-/// Malformed JSON returns [`SafeOutcome::Undefined`]. This never returns an
-/// error type.
+/// returns [`SafeOutcome::Value`]. A forbidden key returns
+/// [`SafeOutcome::Violation`]. Malformed JSON returns [`SafeOutcome::Malformed`].
+/// This never returns an error type.
 ///
 /// # Examples
 ///
@@ -254,7 +255,7 @@ pub fn safe_parse_bytes(bytes: &[u8]) -> SafeOutcome {
 fn fold(result: Result<Option<Value>, Error>) -> SafeOutcome {
     match result {
         Ok(Some(value)) => SafeOutcome::Value(value),
-        Ok(None) => SafeOutcome::Null,
-        Err(_) => SafeOutcome::Undefined,
+        Ok(None) => SafeOutcome::Violation,
+        Err(_) => SafeOutcome::Malformed,
     }
 }

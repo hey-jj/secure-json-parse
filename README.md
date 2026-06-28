@@ -45,12 +45,12 @@ assert_eq!(value, serde_json::json!({"a": 5}));
 use secure_json_parse::{safe_parse, SafeOutcome};
 
 assert!(matches!(safe_parse(r#"{"a": 1}"#), SafeOutcome::Value(_)));
-assert!(matches!(safe_parse(r#"{"__proto__": {}}"#), SafeOutcome::Null));
-assert!(matches!(safe_parse(r#"{"a": "#), SafeOutcome::Undefined));
+assert!(matches!(safe_parse(r#"{"__proto__": {}}"#), SafeOutcome::Violation));
+assert!(matches!(safe_parse(r#"{"a": "#), SafeOutcome::Malformed));
 ```
 
-`Value` means a clean parse, `Null` means a security violation, and `Undefined`
-means malformed JSON.
+`Value` means a clean parse, `Violation` means a forbidden key was found, and
+`Malformed` means the JSON text was invalid.
 
 ### Scanning a parsed value
 

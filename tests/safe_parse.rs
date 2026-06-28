@@ -32,28 +32,28 @@ fn parses_primitives() {
 }
 
 #[test]
-fn nested_proto_returns_null() {
-    assert!(matches!(safe_parse(PROTO_NESTED), SafeOutcome::Null));
+fn nested_proto_returns_violation() {
+    assert!(matches!(safe_parse(PROTO_NESTED), SafeOutcome::Violation));
 }
 
 #[test]
-fn single_proto_returns_null() {
-    assert!(matches!(safe_parse(PROTO), SafeOutcome::Null));
+fn single_proto_returns_violation() {
+    assert!(matches!(safe_parse(PROTO), SafeOutcome::Violation));
 }
 
 #[test]
-fn mixed_returns_null() {
-    assert!(matches!(safe_parse(MIXED_NESTED), SafeOutcome::Null));
+fn mixed_returns_violation() {
+    assert!(matches!(safe_parse(MIXED_NESTED), SafeOutcome::Violation));
 }
 
 #[test]
-fn constructor_with_prototype_returns_null() {
-    assert!(matches!(safe_parse(CTOR), SafeOutcome::Null));
+fn constructor_with_prototype_returns_violation() {
+    assert!(matches!(safe_parse(CTOR), SafeOutcome::Violation));
 }
 
 #[test]
-fn invalid_json_returns_undefined() {
-    assert!(matches!(safe_parse(INVALID), SafeOutcome::Undefined));
+fn invalid_json_returns_malformed() {
+    assert!(matches!(safe_parse(INVALID), SafeOutcome::Malformed));
 }
 
 #[test]
@@ -62,4 +62,20 @@ fn constructor_without_prototype_returns_value() {
         value(safe_parse(CTOR_NO_PROTO)),
         json!({"a": 5, "b": 6, "constructor": {"bar": "baz"}})
     );
+}
+
+#[test]
+fn bytes_path_violation_returns_violation() {
+    assert!(matches!(
+        safe_parse_bytes(br#"{"__proto__": {}}"#),
+        SafeOutcome::Violation
+    ));
+}
+
+#[test]
+fn bytes_path_malformed_returns_malformed() {
+    assert!(matches!(
+        safe_parse_bytes(br#"{"a": "#),
+        SafeOutcome::Malformed
+    ));
 }
