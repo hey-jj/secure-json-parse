@@ -89,6 +89,54 @@ fn constructor_null_is_safe_under_all_actions() {
 }
 
 #[test]
+fn non_object_constructor_value_is_kept() {
+    // A violation needs the constructor value to be an object. A string, number,
+    // or array value is an ordinary key. It is kept under default and remove,
+    // with no error.
+    let inputs = [
+        (
+            r#"{"a": 1, "constructor": "x"}"#,
+            json!({"a": 1, "constructor": "x"}),
+        ),
+        (
+            r#"{"a": 1, "constructor": 5}"#,
+            json!({"a": 1, "constructor": 5}),
+        ),
+        (
+            r#"{"a": 1, "constructor": [1, 2]}"#,
+            json!({"a": 1, "constructor": [1, 2]}),
+        ),
+    ];
+    for (text, expected) in inputs {
+        let default = parse(text, &Options::default()).unwrap().unwrap();
+        assert_eq!(default, expected, "default kept for {text:?}");
+        let removed = parse(text, &ctor_remove()).unwrap().unwrap();
+        assert_eq!(removed, expected, "remove kept for {text:?}");
+    }
+}
+
+#[test]
+fn prototype_of_any_value_is_a_violation() {
+    // The violation is the presence of the prototype key, not its value. A
+    // scalar, bool, or null prototype trips the check just like an object.
+    let inputs = [
+        r#"{"constructor": {"prototype": "x"}}"#,
+        r#"{"constructor": {"prototype": 0}}"#,
+        r#"{"constructor": {"prototype": false}}"#,
+        r#"{"constructor": {"prototype": null}}"#,
+    ];
+    for text in inputs {
+        assert!(
+            matches!(
+                parse(text, &Options::default()),
+                Err(Error::ForbiddenProperty)
+            ),
+            "expected error for {text:?}"
+        );
+    }
+}
+
+#[test]
 fn error_on_constructor_unicode_variants() {
     // Each input escapes some or all of constructor with \uXXXX.
     let variants = [

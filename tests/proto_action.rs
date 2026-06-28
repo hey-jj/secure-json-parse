@@ -106,3 +106,41 @@ fn first_and_last_key_position_both_detected() {
         ));
     }
 }
+
+#[test]
+fn non_object_proto_value_still_errors() {
+    // Detection keys on the property name, not the value shape. A scalar, null,
+    // or array value for __proto__ is a violation just like an object value.
+    let inputs = [
+        r#"{"__proto__": 5}"#,
+        r#"{"__proto__": "x"}"#,
+        r#"{"__proto__": true}"#,
+        r#"{"__proto__": null}"#,
+        r#"{"__proto__": [1, 2]}"#,
+    ];
+    for text in inputs {
+        assert!(
+            matches!(
+                parse(text, &Options::default()),
+                Err(Error::ForbiddenProperty)
+            ),
+            "expected error for {text:?}"
+        );
+    }
+}
+
+#[test]
+fn non_object_proto_value_is_removed() {
+    // Remove strips the __proto__ key whatever its value, keeping siblings.
+    let cases = [
+        (r#"{"a": 1, "__proto__": 5}"#, json!({"a": 1})),
+        (r#"{"a": 1, "__proto__": "x"}"#, json!({"a": 1})),
+        (r#"{"a": 1, "__proto__": null}"#, json!({"a": 1})),
+        (r#"{"a": 1, "__proto__": [1, 2]}"#, json!({"a": 1})),
+        (r#"{"a": 1, "__proto__": true}"#, json!({"a": 1})),
+    ];
+    for (text, expected) in cases {
+        let v = parse(text, &proto_remove()).unwrap().unwrap();
+        assert_eq!(v, expected, "for {text:?}");
+    }
+}
