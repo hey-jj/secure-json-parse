@@ -8,3 +8,6 @@ repository = "https://github.com/hey-jj/secure-json-parse"
 readme = "README.md"
 
 [dependencies]
+# serde_json supplies the conformant JSON parser. Forbidden keys are ordinary
+# map keys in the resulting Value tree, which is what the scan walks.
+serde_json = "1"
