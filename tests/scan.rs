@@ -45,8 +45,24 @@ fn error_action_throws() {
 
 #[test]
 fn constructor_remove_in_array() {
-    // filter walks array elements, so a constructor inside a list is cleaned.
+    // scan walks array elements, so a constructor inside a list is cleaned.
     let obj = json!({"list": [{"constructor": {"prototype": {}}}]});
     let cleaned = scan(obj, &ctor_remove()).unwrap().unwrap();
     assert_eq!(cleaned, json!({"list": [{}]}));
+}
+
+#[test]
+fn deeply_nested_value_does_not_overflow_the_stack() {
+    // scan takes a caller-built Value, which can be far deeper than the parser
+    // would ever accept. The walk uses a worklist, not recursion, so a 100k-deep
+    // tree returns instead of aborting the process with a stack overflow.
+    use serde_json::{Map, Value};
+    let mut value = Value::Object(Map::new());
+    for _ in 0..100_000 {
+        let mut outer = Map::new();
+        outer.insert("c".into(), value);
+        value = Value::Object(outer);
+    }
+    let result = scan(value, &ctor_remove());
+    assert!(result.is_ok());
 }
