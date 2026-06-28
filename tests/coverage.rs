@@ -65,22 +65,42 @@ fn benchmark_lookalike_input_is_clean() {
     assert!(parse(text, &Options::default()).is_ok());
 }
 
-#[test]
-fn deep_nesting_does_not_overflow() {
-    // serde_json caps parse recursion, so any value the parser accepts is within
-    // a depth the walk handles without overflowing the stack. Use a depth near
-    // that cap to exercise the deepest accepted input.
-    let depth = 120;
+/// Build JSON nesting `depth` objects under key `a`, with `leaf` at the bottom.
+fn nested(depth: usize, leaf: &str) -> String {
     let mut text = String::new();
     for _ in 0..depth {
         text.push_str(r#"{"a":"#);
     }
-    text.push('1');
+    text.push_str(leaf);
     for _ in 0..depth {
         text.push('}');
     }
-    let v = parse(&text, &Options::default());
-    assert!(v.is_ok(), "parser should accept depth {depth}");
+    text
+}
+
+#[test]
+fn walk_reaches_the_deepest_accepted_input() {
+    // serde_json accepts 127 levels and rejects 128. The leaf object that holds
+    // __proto__ is itself 2 levels deep, so 125 wrapper levels put the forbidden
+    // key at the bottom of the deepest input the parser accepts. The walk must
+    // descend all the way and detect it, which proves the walk handles every
+    // depth the parser lets through.
+    let deepest = nested(125, r#"{"__proto__": {"x": 1}}"#);
+    assert!(matches!(
+        parse(&deepest, &Options::default()),
+        Err(Error::ForbiddenProperty)
+    ));
+}
+
+#[test]
+fn parser_rejects_one_past_the_ceiling() {
+    // Depth 128 is past the parser recursion limit. This pins the ceiling, so a
+    // future change to the limit shows up as a test failure here.
+    let past = nested(128, "1");
+    assert!(matches!(
+        parse(&past, &Options::default()),
+        Err(Error::Syntax(_))
+    ));
 }
 
 #[test]
