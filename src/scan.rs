@@ -5,9 +5,9 @@ use serde_json::Value;
 
 /// Walk a parsed value and apply the prototype-poisoning checks.
 ///
-/// `value` is taken by value and returned on success, mutated in place when an
-/// action is [`Action::Remove`]. Scalars and `null` are returned unchanged.
-/// Objects and arrays are walked.
+/// `value` is consumed and the cleaned value is returned on success. Under
+/// [`Action::Remove`] the forbidden keys are dropped from the returned value.
+/// Scalars and `null` are returned unchanged. Objects and arrays are walked.
 ///
 /// Returns `Ok(Some(value))` when the value is clean or only had keys removed.
 /// Returns `Ok(None)` when `safe` is on and a violation is found. Returns
@@ -55,50 +55,43 @@ enum Walk {
     Error,
 }
 
-/// Recursively check and clean one node.
+/// Check and clean every node in the tree.
 ///
-/// Order within a node matches the source algorithm: the `__proto__` check runs
-/// first, then the `constructor` check, then children are visited. For
-/// [`Action::Remove`] the removed subtree is dropped before recursion, so it is
-/// never visited again.
-fn walk(node: &mut Value, options: &Options) -> Walk {
-    let Value::Object(map) = node else {
-        // Arrays still hold scannable children; scalars and null do not.
-        if let Value::Array(items) = node {
-            for item in items.iter_mut() {
-                match walk(item, options) {
-                    Walk::Clean => {}
-                    other => return other,
+/// Within a node the `__proto__` check runs first, then the `constructor`
+/// check, then children are visited. Under [`Action::Remove`] a removed subtree
+/// is dropped before its children are enqueued, so it is never visited again.
+/// The walk uses an explicit worklist, so stack use stays flat no matter how
+/// deep the tree is.
+fn walk(root: &mut Value, options: &Options) -> Walk {
+    let mut worklist: Vec<&mut Value> = vec![root];
+    while let Some(node) = worklist.pop() {
+        match node {
+            Value::Object(map) => {
+                if options.proto_action != Action::Ignore && map.contains_key("__proto__") {
+                    if options.safe {
+                        return Walk::Null;
+                    }
+                    if options.proto_action == Action::Error {
+                        return Walk::Error;
+                    }
+                    map.remove("__proto__");
                 }
+
+                if options.constructor_action != Action::Ignore && is_constructor_violation(map) {
+                    if options.safe {
+                        return Walk::Null;
+                    }
+                    if options.constructor_action == Action::Error {
+                        return Walk::Error;
+                    }
+                    map.remove("constructor");
+                }
+
+                worklist.extend(map.values_mut());
             }
-        }
-        return Walk::Clean;
-    };
-
-    if options.proto_action != Action::Ignore && map.contains_key("__proto__") {
-        if options.safe {
-            return Walk::Null;
-        }
-        if options.proto_action == Action::Error {
-            return Walk::Error;
-        }
-        map.remove("__proto__");
-    }
-
-    if options.constructor_action != Action::Ignore && is_constructor_violation(map) {
-        if options.safe {
-            return Walk::Null;
-        }
-        if options.constructor_action == Action::Error {
-            return Walk::Error;
-        }
-        map.remove("constructor");
-    }
-
-    for child in map.values_mut() {
-        match walk(child, options) {
-            Walk::Clean => {}
-            other => return other,
+            Value::Array(items) => worklist.extend(items.iter_mut()),
+            // Scalars and null hold no scannable children.
+            _ => {}
         }
     }
     Walk::Clean
