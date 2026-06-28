@@ -6,6 +6,8 @@ description = "prototype-poisoning-safe JSON parsing of untrusted input"
 license = "MIT"
 repository = "https://github.com/hey-jj/secure-json-parse"
 readme = "README.md"
+keywords = ["json", "security", "serde", "parsing", "sanitize"]
+categories = ["parsing", "parser-implementations", "web-programming"]
 
 [dependencies]
 # serde_json supplies the conformant JSON parser. Forbidden keys are ordinary
