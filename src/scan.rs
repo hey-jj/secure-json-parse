@@ -40,8 +40,28 @@ pub fn scan(mut value: Value, options: &Options) -> Result<Option<Value>, Error>
     }
     match walk(&mut value, options) {
         Walk::Clean => Ok(Some(value)),
-        Walk::Null => Ok(None),
-        Walk::Error => Err(Error::ForbiddenProperty),
+        // A rejection drops `value` here. The walk may stop early, so an unwalked
+        // deep sibling can still be present. Drain it so the drop cannot overflow.
+        Walk::Null => {
+            drain(value);
+            Ok(None)
+        }
+        Walk::Error => {
+            drain(value);
+            Err(Error::ForbiddenProperty)
+        }
+    }
+}
+
+/// Drop a value without recursing, so a deep tree cannot overflow the stack.
+fn drain(value: Value) {
+    let mut stack = vec![value];
+    while let Some(node) = stack.pop() {
+        match node {
+            Value::Array(items) => stack.extend(items),
+            Value::Object(map) => stack.extend(map.into_iter().map(|(_, v)| v)),
+            _ => {}
+        }
     }
 }
 

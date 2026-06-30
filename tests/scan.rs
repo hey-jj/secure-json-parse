@@ -78,3 +78,23 @@ fn deeply_nested_value_does_not_overflow_the_stack() {
         }
     }
 }
+
+#[test]
+fn deeply_nested_rejection_does_not_overflow_the_stack() {
+    // A violation at the root rejects before the deep sibling is walked. scan
+    // consumes the value, so it must drain the rejected tree without recursing
+    // into the deep sibling on drop.
+    use serde_json::{Map, Value};
+    let mut deep = Value::Object(Map::new());
+    for _ in 0..100_000 {
+        let mut outer = Map::new();
+        outer.insert("c".into(), deep);
+        deep = Value::Object(outer);
+    }
+    let mut root = Map::new();
+    root.insert("__proto__".into(), Value::Bool(true));
+    root.insert("deep".into(), deep);
+
+    let result = scan(Value::Object(root), &Options::default());
+    assert!(matches!(result, Err(Error::ForbiddenProperty)));
+}
