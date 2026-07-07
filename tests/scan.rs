@@ -5,7 +5,7 @@ mod common;
 
 use common::*;
 use secure_json_parse::{scan, Error, Options};
-use serde_json::json;
+use serde_json::{json, Map, Value};
 
 #[test]
 fn clean_object_with_default_options_is_ok() {
@@ -49,6 +49,36 @@ fn constructor_remove_in_array() {
     let obj = json!({"list": [{"constructor": {"prototype": {}}}]});
     let cleaned = scan(obj, &ctor_remove()).unwrap().unwrap();
     assert_eq!(cleaned, json!({"list": [{}]}));
+}
+
+#[test]
+fn removed_deep_subtrees_do_not_overflow_the_stack() {
+    fn nested_value(depth: usize) -> Value {
+        let mut value = Value::Bool(true);
+        for _ in 0..depth {
+            let mut outer = Map::new();
+            outer.insert("next".into(), value);
+            value = Value::Object(outer);
+        }
+        value
+    }
+
+    let mut root = Map::new();
+    root.insert("__proto__".into(), nested_value(100_000));
+    root.insert("keep".into(), Value::Bool(true));
+
+    let cleaned = scan(Value::Object(root), &proto_remove()).unwrap().unwrap();
+    assert_eq!(cleaned, json!({"keep": true}));
+
+    let mut constructor = Map::new();
+    constructor.insert("prototype".into(), nested_value(100_000));
+
+    let mut root = Map::new();
+    root.insert("constructor".into(), Value::Object(constructor));
+    root.insert("keep".into(), Value::Bool(true));
+
+    let cleaned = scan(Value::Object(root), &ctor_remove()).unwrap().unwrap();
+    assert_eq!(cleaned, json!({"keep": true}));
 }
 
 #[test]

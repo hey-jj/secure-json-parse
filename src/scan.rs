@@ -94,7 +94,9 @@ fn walk(root: &mut Value, options: &Options) -> Walk {
                     if options.proto_action == Action::Error {
                         return Walk::Error;
                     }
-                    map.remove("__proto__");
+                    if let Some(removed) = map.remove("__proto__") {
+                        drain(removed);
+                    }
                 }
 
                 if options.constructor_action != Action::Ignore && is_constructor_violation(map) {
@@ -104,7 +106,9 @@ fn walk(root: &mut Value, options: &Options) -> Walk {
                     if options.constructor_action == Action::Error {
                         return Walk::Error;
                     }
-                    map.remove("constructor");
+                    if let Some(removed) = map.remove("constructor") {
+                        drain(removed);
+                    }
                 }
 
                 worklist.extend(map.values_mut());
